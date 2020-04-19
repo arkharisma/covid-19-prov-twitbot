@@ -1,5 +1,5 @@
 const Twit = require('twit')
-const https = require("https");
+const fetch = require("node-fetch");
 const fs = require('fs')
 const config = require('./config')
 const T = new Twit(config)
@@ -13,14 +13,14 @@ let post_promise = require('util').promisify( // Wrap post function w/ promisify
 );
 
 // Async/await for the results of the previous post, get the id...
-const tweet_crafter = async (array, id) => { 
+const tweet_crafter = async (array, id) => {
     for(let i = 1; i < array.length; i++){
         let content = await post_promise('statuses/update', { status: array[i], in_reply_to_status_id: id });
         id = content[0].id_str;
     };
 };
 
-const tweet = (first, subsequent) => { 
+const tweet = (first, subsequent) => {
     post_promise('statuses/update', { status: `${first}` })
         .then((top_tweet) => {
             console.log(`${top_tweet[0].text} tweeted!`);
@@ -42,60 +42,39 @@ const getEachProvinceTweet = (data) => {
     return `${data.provinsi}, kasus positif: ${data.kasusPosi}, kasus sembuh: ${data.kasusSemb}, kasus meninggal: ${data.kasusMeni}.`
 }
 
-const tweetIt = () => {
-    const url = "https://indonesia-covid-19.mathdro.id/api";
-    const urlProv = "https://indonesia-covid-19.mathdro.id/api/provinsi";
+const tweetIt = async () => {
+  let firstResponse = await fetch("https://indonesia-covid-19.mathdro.id/api");
+  firstResponse = await firstResponse.json();
 
-    https.get(url, res => {
-        res.setEncoding("utf8");
-        let body = "";
-        res.on("data", data => {
-            body += data;
-        });
-        res.on("end", () => {
-            body = JSON.parse(body);
-            const dataAPI = {
-                jumlahKasus: body.jumlahKasus,
-                meninggal: body.meninggal,
-                sembuh: body.sembuh,
-                perawatan: body.perawatan
-            }
-            https.get(urlProv, res => {
-                res.setEncoding("utf8");
-                let body = "";
-                res.on("data", data => {
-                    body += data;
-                });
-                res.on("end", () => {
-                    body = JSON.parse(body);
-                    dataAPI.dataProv = body.data
-    
-                    // Making timestamp
-                    let ts = Date.now()
+  data = {
+    jumlahKasus: firstResponse.jumlahKasus,
+    meninggal: firstResponse.meninggal,
+    sembuh: firstResponse.sembuh,
+    perawatan: firstResponse.perawatan
+  };
 
-                    // Making tweets
-                    let tweets = [
-                        getFirstTweet(ts, dataAPI)
-                    ]
+  // declare tweets
+  let tweets = [ getFirstTweet(Date.now(), data) ];
 
-                    let totalCount = 0;
+  let secondResponse = await fetch(firstResponse.perProvinsi.json);
+  secondResponse = await secondResponse.json();
 
-                    dataAPI.dataProv.forEach(element => {
-                        totalCount += parseInt(element.kasusPosi)
-                        let tweet = getEachProvinceTweet(element)
-                        tweets.push(tweet)
-                    });
+  data.dataProv = secondResponse.data;
 
-                    let dataCompare = parseInt(fs.readFileSync("dataCompare.txt"))
-                    if((dataAPI.jumlahKasus == totalCount) && (totalCount != dataCompare)){
-                        fs.writeFileSync("dataCompare.txt", dataAPI.jumlahKasus)
-                        tweet(tweets[0], tweets)
-                    }
-                });
-            });
-        });
-    });
-};
+  let totalCount = 0;
+
+  for (let iter = 0; iter < data.dataProv.length; iter++){
+    data.dataProv[iter].provinsi === 'Indonesia' ? data.dataProv[iter].provinsi = 'Dalam proses verifikasi' : null;
+    totalCount += parseInt(data.dataProv[iter].kasusPosi);
+    tweets.push(getEachProvinceTweet(data.dataProv[iter]));
+  }
+
+  let dataCompare = parseInt(fs.readFileSync("dataCompare.txt"));
+  if((data.jumlahKasus == totalCount) && (totalCount != dataCompare)){
+      fs.writeFileSync("dataCompare.txt", dataAPI.jumlahKasus);
+      tweet(tweets[0], tweets)
+  }
+}
 
 tweetIt()
 
