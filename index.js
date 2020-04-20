@@ -71,7 +71,7 @@ const tweetIt = async () => {
 
   let dataCompare = parseInt(fs.readFileSync("dataCompare.txt"));
   if((data.jumlahKasus == totalCount) && (totalCount != dataCompare)){
-      fs.writeFileSync("dataCompare.txt", dataAPI.jumlahKasus);
+      fs.writeFileSync("dataCompare.txt", data.jumlahKasus);
       tweet(tweets[0], tweets)
   }
 }
