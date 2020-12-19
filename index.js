@@ -113,7 +113,7 @@ const tweetIt = async () => {
     tweets.push(getEachProvinceTweet(data.dataProv[iter], getDataCompareByKodeProv(fid, dataCompare.dataProv)));
   }
 
-  if (isJumlahKasusDifferent) {
+  if (isJumlahKasusDifferent(data, dataCompare)) {
     writeRecentData(data);
     tweet(tweets[0], tweets);
   }
